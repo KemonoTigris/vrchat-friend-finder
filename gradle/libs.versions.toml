@@ -15,9 +15,9 @@ kotlinxDatetime = { module = "org.jetbrains.kotlinx:kotlinx-datetime", version.r
 kotlinxSerialization = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinxSerializationJSON" }
 kotlinxCoroutines = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "kotlinxCoroutines" }
 ktorClientCore = { module = "io.ktor:ktor-client-core", version.ref = "ktorVersion" }
-ktorClientCio = { module = "io.ktor:ktor-client-core", version.ref = "ktorVersion" }
-ktorClientContentNegotiation = { module = "io.ktor:ktor-client-core", version.ref = "ktorVersion" }
-ktorClientAuth = { module = "io.ktor:ktor-client-core", version.ref = "ktorVersion" }
+ktorClientCio = { module = "io.ktor:ktor-client-cio", version.ref = "ktorVersion" }
+ktorClientContentNegotiation = { module = "io.ktor:ktor-client-content-negotiation", version.ref = "ktorVersion" }
+ktorClientAuth = { module = "io.ktor:ktor-client-auth", version.ref = "ktorVersion" }
 
 # Libraries can be bundled together for easier import
 [bundles]
