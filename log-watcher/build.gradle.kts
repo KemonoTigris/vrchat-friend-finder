@@ -9,7 +9,7 @@ repositories {
 }
 
 dependencies {
-    implementation(project(":config"))
+    implementation(projects.config)
     implementation(libs.kotlinxCoroutines)
     testImplementation(kotlin("test"))
 }

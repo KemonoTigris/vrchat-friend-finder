@@ -16,16 +16,15 @@ dependencies {
     implementation(libs.ktorClientCio)
     implementation(libs.ktorClientContentNegotiation)
     implementation(libs.ktorClientAuth)
-    implementation(libs.kotlinxSerialization)
 
     // Coroutines
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.6.4")
+    implementation(libs.kotlinxCoroutines)
 
     // Serialization
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.5.0")
+    implementation(libs.kotlinxSerialization)
 
     // Database module
-    implementation(project(":database"))
+    implementation(projects.database)
 
     testImplementation(kotlin("test"))
 }

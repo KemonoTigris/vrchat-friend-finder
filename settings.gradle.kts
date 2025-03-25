@@ -1,5 +1,7 @@
 rootProject.name = "vrc-friend-finder"
 
+enableFeaturePreview("TYPESAFE_PROJECT_ACCESSORS")
+
 // The settings file is the entry point of every Gradle build.
 // Its primary purpose is to define the subprojects.
 // It is also used for some aspects of project-wide configuration, like managing plugins, dependencies, etc.
