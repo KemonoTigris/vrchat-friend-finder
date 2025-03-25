@@ -38,12 +38,13 @@ class LogWatcher() {
     }
 
     fun getLatestLogFile(dir: File): File? {
+        println("Looking for latest log file in directory: ${dir.absolutePath}")
         // Define a regex pattern for log file names in the expected format.
         val logFileRegex = Regex("output_log_(\\d{4}-\\d{2}-\\d{2}_\\d{2}-\\d{2}-\\d{2})\\.txt")
         // Define a formatter matching the date-time part in the filename.
         val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd_HH-mm-ss")
 
-        return dir.listFiles { file ->
+        val latestFile = dir.listFiles { file ->
             file.isFile && file.name.matches(logFileRegex)
         }?.maxByOrNull { file ->
             // Extract the timestamp part.
@@ -56,37 +57,47 @@ class LogWatcher() {
                 LocalDateTime.MIN
             }
         }
+        if (latestFile != null) {
+            println("Latest log file found: ${latestFile.name}")
+        } else {
+            println("No log file found in directory: ${dir.absolutePath}")
+        }
+        return latestFile
     }
 
     private suspend fun watchLogFile() {
-        println(properties.getProperty("directory.vrchatlogs"))
+        val directoryPath = properties.getProperty("directory.vrchatlogs")
+        println("Starting to watch log files in directory: $directoryPath")
         val dir = File(properties.getProperty("directory.vrchatlogs"))
 
         // Get the latest log file based on the timestamp in its name.
-        val file = getLatestLogFile(dir) ?: run {
-            println("No log file found in directory: ${dir.absolutePath}")
-            return
-        }
+        val file = getLatestLogFile(dir) ?: return
 
         var lastPosition = if (file.exists()) file.length() else 0L
+        println("Initial file size for '${file.name}': $lastPosition bytes")
 
         try {
             FileSystems.getDefault().newWatchService().use { watchService ->
                 dir.toPath().register(watchService, ENTRY_MODIFY)
+                println("WatchService registered for directory: ${dir.absolutePath}")
                 while (watchJob.isActive) {
                     // Process existing content first
                     if (file.exists() && file.length() > lastPosition) {
+                        println("Detected new content in '${file.name}' from position $lastPosition to ${file.length()}")
                         processNewContent(file, lastPosition)
                         lastPosition = file.length()
                     }
 
                     // Wait for next change
+                    println("Polling for changes...")
                     val key = watchService.poll(5, java.util.concurrent.TimeUnit.SECONDS)
                     key?.pollEvents()?.forEach { event ->
                         if (event.kind() != OVERFLOW &&
                             (event as WatchEvent<Path>).context().fileName.toString() == file.name
                         ) {
+                            println("Received ${event.kind()} event for file: ${file.name}")
                             if (file.exists() && file.length() > lastPosition) {
+                                println("New content detected after event in '${file.name}'")
                                 processNewContent(file, lastPosition)
                                 lastPosition = file.length()
                             }
@@ -101,11 +112,13 @@ class LogWatcher() {
     }
 
     private fun processNewContent(file: File, fromPosition: Long) {
+        println("Processing new content in file '${file.name}' starting at position $fromPosition")
         try {
             RandomAccessFile(file, "r").use { raf ->
                 raf.seek(fromPosition)
                 var line: String? = raf.readLine()
                 while (line != null) {
+                    println("Processing line: $line")
                     processLine(line)
                     line = raf.readLine()
                 }
@@ -120,15 +133,22 @@ class LogWatcher() {
             line.contains("OnPlayerJoined") -> {
                 val userId = extractUserId(line)
                 if (userId.isNotBlank()) {
+                    println("User joined detected: $userId")
                     currentUsers.add(userId)
+                    println("Current users count: ${currentUsers.size}")
                 }
             }
 
             line.contains("OnPlayerLeft") -> {
                 val userId = extractUserId(line)
                 if (userId.isNotBlank()) {
+                    println("User left detected: $userId")
                     currentUsers.remove(userId)
+                    println("Current users count: ${currentUsers.size}")
                 }
+            }
+            else -> {
+                println("No action for line: $line")
             }
         }
     }
@@ -137,10 +157,14 @@ class LogWatcher() {
         // Example line:
         // 2025.03.20 20:26:58 Debug - [Behaviour] OnPlayerJoined username (usr_bbe1cab4-63bf-4d72-9841-661cd72685e6)
         val match = userIdRegex.find(line)
-        return match?.groupValues?.getOrNull(1) ?: ""
+        val userId = match?.groupValues?.getOrNull(1) ?: ""
+        println("Extracted userId: '$userId' from line: $line")
+        return userId
     }
 
     fun stop() {
+        println("Stopping LogWatcher...")
+
         watchJob.cancel()
         ioScope.cancel()
     }
