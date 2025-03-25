@@ -5,18 +5,24 @@
 [versions]
 kotlin = "2.1.10"
 kotlinxDatetime = "0.6.1"
-kotlinxSerializationJSON = "1.7.2"
+kotlinxSerializationJSON = "1.8.0"
 kotlinxCoroutines = "1.8.1"
+ktorVersion = "3.1.1"
 
 [libraries]
 kotlinGradlePlugin = { module = "org.jetbrains.kotlin:kotlin-gradle-plugin", version.ref = "kotlin" }
 kotlinxDatetime = { module = "org.jetbrains.kotlinx:kotlinx-datetime", version.ref = "kotlinxDatetime" }
 kotlinxSerialization = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinxSerializationJSON" }
 kotlinxCoroutines = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "kotlinxCoroutines" }
+ktorClientCore = { module = "io.ktor:ktor-client-core", version.ref = "ktorVersion" }
+ktorClientCio = { module = "io.ktor:ktor-client-core", version.ref = "ktorVersion" }
+ktorClientContentNegotiation = { module = "io.ktor:ktor-client-core", version.ref = "ktorVersion" }
+ktorClientAuth = { module = "io.ktor:ktor-client-core", version.ref = "ktorVersion" }
 
 # Libraries can be bundled together for easier import
 [bundles]
 kotlinxEcosystem = ["kotlinxDatetime", "kotlinxSerialization", "kotlinxCoroutines"]
 
 [plugins]
+kotlinJvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
 kotlinPluginSerialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
