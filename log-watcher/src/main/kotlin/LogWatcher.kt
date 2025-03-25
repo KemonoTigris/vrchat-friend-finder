@@ -134,7 +134,6 @@ class LogWatcher() {
                 raf.seek(fromPosition)
                 var line: String? = raf.readLine()
                 while (line != null) {
-                    println("Processing line: $line")
                     processLine(line)
                     line = raf.readLine()
                 }
