@@ -37,7 +37,7 @@ class LogWatcher() {
         }
     }
 
-    fun getLatestLogFile(dir: File): File? {
+    private fun getLatestLogFile(dir: File): File? {
         println("Looking for latest log file in directory: ${dir.absolutePath}")
         // Define a regex pattern for log file names in the expected format.
         val logFileRegex = Regex("output_log_(\\d{4}-\\d{2}-\\d{2}_\\d{2}-\\d{2}-\\d{2})\\.txt")
@@ -68,39 +68,55 @@ class LogWatcher() {
     private suspend fun watchLogFile() {
         val directoryPath = properties.getProperty("directory.vrchatlogs")
         println("Starting to watch log files in directory: $directoryPath")
-        val dir = File(properties.getProperty("directory.vrchatlogs"))
+        val dir = File(directoryPath)
 
-        // Get the latest log file based on the timestamp in its name.
-        val file = getLatestLogFile(dir) ?: return
-
-        var lastPosition = if (file.exists()) file.length() else 0L
-        println("Initial file size for '${file.name}': $lastPosition bytes")
+        // Identify our initial "current" file and the last position
+        var currentFile: File? = getLatestLogFile(dir)
+        var lastPosition = currentFile?.let { if (it.exists()) it.length() else 0L } ?: 0L
+        println("Initial file: '${currentFile?.name}' with size: $lastPosition bytes")
 
         try {
             FileSystems.getDefault().newWatchService().use { watchService ->
                 dir.toPath().register(watchService, ENTRY_MODIFY)
                 println("WatchService registered for directory: ${dir.absolutePath}")
+
                 while (watchJob.isActive) {
-                    // Process existing content first
-                    if (file.exists() && file.length() > lastPosition) {
-                        println("Detected new content in '${file.name}' from position $lastPosition to ${file.length()}")
-                        processNewContent(file, lastPosition)
-                        lastPosition = file.length()
+                    // Always re-check if there's a newer log file
+                    val latestFile = getLatestLogFile(dir)
+
+                    if (latestFile != null && latestFile != currentFile) {
+                        // Switch to the new log file
+                        println("Switching to a new log file: ${latestFile.name}")
+                        currentFile = latestFile
+                        // Decide whether to read from the start or skip to end:
+                        // lastPosition = 0L     // to read the entire new file from the beginning
+                        lastPosition = currentFile!!.length() // to only read new lines in the new file
                     }
 
-                    // Wait for next change
+                    // If we have a current file, check for new data
+                    if (currentFile != null && currentFile!!.exists()) {
+                        if (currentFile!!.length() > lastPosition) {
+                            println(
+                                "Detected new content in '${currentFile!!.name}' from " +
+                                        "position $lastPosition to ${currentFile!!.length()}"
+                            )
+                            processNewContent(currentFile!!, lastPosition)
+                            lastPosition = currentFile!!.length()
+                        }
+                    }
+
+                    // Wait/poll for filesystem events
                     println("Polling for changes...")
                     val key = watchService.poll(5, java.util.concurrent.TimeUnit.SECONDS)
                     key?.pollEvents()?.forEach { event ->
-                        if (event.kind() != OVERFLOW &&
-                            (event as WatchEvent<Path>).context().fileName.toString() == file.name
-                        ) {
-                            println("Received ${event.kind()} event for file: ${file.name}")
-                            if (file.exists() && file.length() > lastPosition) {
-                                println("New content detected after event in '${file.name}'")
-                                processNewContent(file, lastPosition)
-                                lastPosition = file.length()
-                            }
+                        if (event.kind() != OVERFLOW) {
+                            // We only care about modifies, but you could refine event checks
+                            val changedFile = (event as WatchEvent<Path>).context().fileName.toString()
+                            println("Received ${event.kind()} event: $changedFile")
+
+                            // If the event refers to the file we’re currently reading,
+                            // or if a brand new file is the newest, we’ll handle it
+                            // on the *next* loop iteration (because we do getLatestLogFile above).
                         }
                     }
                     key?.reset()
@@ -146,9 +162,6 @@ class LogWatcher() {
                     currentUsers.remove(userId)
                     println("Current users count: ${currentUsers.size}")
                 }
-            }
-            else -> {
-                println("No action for line: $line")
             }
         }
     }
