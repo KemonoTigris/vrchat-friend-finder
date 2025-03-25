@@ -1,3 +1,5 @@
+rootProject.name = "vrc-friend-finder"
+
 // The settings file is the entry point of every Gradle build.
 // Its primary purpose is to define the subprojects.
 // It is also used for some aspects of project-wide configuration, like managing plugins, dependencies, etc.
@@ -20,8 +22,10 @@ plugins {
 // If there are changes in only one of the projects, Gradle will rebuild only the one that has changed.
 // Learn more about structuring projects with Gradle - https://docs.gradle.org/8.7/userguide/multi_project_builds.html
 include(":app")
-include(":utils")
 
-rootProject.name = "vrc-friend-finder"
 include("log-watcher")
 include("config")
+include("pair-score")
+include("vrc-api")
+include("openai-api")
+include("database")

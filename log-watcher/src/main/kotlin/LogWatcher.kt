@@ -151,6 +151,7 @@ class LogWatcher() {
                     println("User joined detected: $userId")
                     currentUsers.add(userId)
                     println("Current users count: ${currentUsers.size}")
+                    _usersInInstanceFlow.value = currentUsers.toSet()
                 }
             }
 
@@ -160,6 +161,7 @@ class LogWatcher() {
                     println("User left detected: $userId")
                     currentUsers.remove(userId)
                     println("Current users count: ${currentUsers.size}")
+                    _usersInInstanceFlow.value = currentUsers.toSet()
                 }
             }
         }
