@@ -17,3 +17,7 @@ application {
     // (Note that Kotlin compiles `App.kt` to a class with FQN `com.example.app.AppKt`.)
     mainClass = "com.kemonotigris.app.AppKt"
 }
+
+tasks.named<JavaExec>("run") {
+    standardInput = System.`in`
+}
