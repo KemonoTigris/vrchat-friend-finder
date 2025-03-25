@@ -23,3 +23,5 @@ include(":app")
 include(":utils")
 
 rootProject.name = "vrc-friend-finder"
+include("log-watcher")
+include("config")
