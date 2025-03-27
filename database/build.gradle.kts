@@ -1,5 +1,6 @@
 plugins {
     alias(libs.plugins.kotlinJvm)
+    alias(libs.plugins.sqlDelight)
 }
 
 group = "com.kemonotigris"
@@ -9,7 +10,16 @@ repositories {
     mavenCentral()
 }
 
+sqldelight {
+    databases {
+        create("VRChatDatabase") {
+            packageName = "com.kemonotigris"
+        }
+    }
+}
+
 dependencies {
+    implementation(libs.sqlDelight)
     testImplementation(kotlin("test"))
 }
 

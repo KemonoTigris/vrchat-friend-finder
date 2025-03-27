@@ -23,8 +23,6 @@ dependencies {
     // Serialization
     implementation(libs.kotlinxSerialization)
 
-    // Database module
-    implementation(projects.database)
 
     testImplementation(kotlin("test"))
 }

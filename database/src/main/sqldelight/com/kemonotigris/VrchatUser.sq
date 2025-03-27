@@ -1,0 +1,53 @@
+CREATE TABLE user (
+    id TEXT NOT NULL PRIMARY KEY,
+    name TEXT,
+    bio TEXT,
+    bioLinks TEXT,
+    avatar_image_url TEXT,
+    avatar_thumbnail_url TEXT,
+    status TEXT,
+    is_friend INTEGER,  -- SQLite doesn't have a boolean type, use INTEGER (0/1)
+    last_login TEXT,
+    last_updated INTEGER  -- store as epoch millis
+);
+
+-- Basic queries:
+insertOrReplaceUser:
+INSERT OR REPLACE INTO user (
+    id,
+    name,
+    bio,
+    bioLinks,
+    avatar_image_url,
+    avatar_thumbnail_url,
+    status,
+    is_friend,
+    last_login,
+    last_updated
+)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+selectUserById:
+SELECT * FROM user
+WHERE id = ?;
+
+selectAllUsers:
+SELECT * FROM user;
+
+selectFriends:
+SELECT * FROM user
+WHERE is_friend = 1;
+
+selectUsersByStatus:
+SELECT * FROM user
+WHERE status = ?;
+
+updateUserLastUpdated:
+UPDATE user
+SET last_updated = ?
+WHERE id = ?;
+
+-- Utility queries for time-based operations
+selectUsersUpdatedBefore:
+SELECT * FROM user
+WHERE last_updated < ?;
