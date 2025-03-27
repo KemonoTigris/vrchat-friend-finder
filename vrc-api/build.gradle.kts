@@ -16,12 +16,16 @@ dependencies {
     implementation(libs.ktorClientCio)
     implementation(libs.ktorClientContentNegotiation)
     implementation(libs.ktorClientAuth)
+    implementation("io.ktor:ktor-client-logging:3.1.1")
+
 
     // Coroutines
     implementation(libs.kotlinxCoroutines)
 
     // Serialization
     implementation(libs.kotlinxSerialization)
+    implementation("ch.qos.logback:logback-classic:1.4.12")
+
 
 
     testImplementation(kotlin("test"))

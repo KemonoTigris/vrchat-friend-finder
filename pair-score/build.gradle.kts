@@ -10,9 +10,8 @@ repositories {
 }
 
 dependencies {
+    implementation(projects.config)
     implementation(projects.vrcApi)
-
-    // Database module
     implementation(projects.database)
 
     testImplementation(kotlin("test"))
