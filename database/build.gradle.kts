@@ -12,7 +12,7 @@ repositories {
 
 sqldelight {
     databases {
-        create("VRChatDatabase") {
+        create("Database") {
             packageName = "com.kemonotigris"
         }
     }

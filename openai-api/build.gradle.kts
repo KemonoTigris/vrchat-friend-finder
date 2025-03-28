@@ -17,6 +17,7 @@ dependencies {
     implementation(libs.ktorClientContentNegotiation)
     implementation(libs.ktorClientAuth)
     implementation(projects.vrcApi)
+    implementation(projects.database)
 
     implementation(libs.ktorClientLogging)
 

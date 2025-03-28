@@ -1,0 +1,36 @@
+-- Table to store compatibility analysis results
+CREATE TABLE IF NOT EXISTS compatibility_analysis (
+    user_id TEXT NOT NULL,            -- The VRChat user ID being analyzed
+    user_name TEXT NOT NULL,          -- Name of the VRChat user being analyzed
+    compatibility_score INTEGER NOT NULL,      -- Score from 1-100
+    compatibility_reason TEXT NOT NULL,        -- Explanation for the score
+    suggested_questions TEXT NOT NULL,         -- List of questions separated by |||
+    created_at INTEGER NOT NULL       -- When this analysis was performed (epoch millis)
+);
+
+-- Queries for compatibility analysis
+insertOrReplaceCompatibilityAnalysis:
+INSERT OR REPLACE INTO compatibility_analysis (
+    user_id,
+    user_name,
+    compatibility_score,
+    compatibility_reason,
+    suggested_questions,
+    created_at
+)
+VALUES (?, ?, ?, ?, ?, ?);
+
+selectCompatibilityAnalysisForUser:
+SELECT * FROM compatibility_analysis
+WHERE user_id = ?
+ORDER BY created_at DESC
+LIMIT 1;
+
+selectAllCompatibilityAnalyses:
+SELECT * FROM compatibility_analysis
+ORDER BY compatibility_score DESC;
+
+selectTopCompatibilityScores:
+SELECT * FROM compatibility_analysis
+ORDER BY compatibility_score DESC
+LIMIT ?;

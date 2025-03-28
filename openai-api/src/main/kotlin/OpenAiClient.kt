@@ -28,7 +28,7 @@ class OpenAiClient(private val apiKey: String) {
 
     private val client = HttpClient(CIO) {
         install(HttpTimeout) {
-            requestTimeoutMillis = 30000  // 30 seconds timeout
+            requestTimeoutMillis = 30000
             connectTimeoutMillis = 30000
             socketTimeoutMillis = 30000
         }
@@ -37,6 +37,7 @@ class OpenAiClient(private val apiKey: String) {
     private val jsonFormat = Json {
         ignoreUnknownKeys = true
         isLenient = true
+        prettyPrint = true
     }
 
     /**
@@ -91,6 +92,7 @@ class OpenAiClient(private val apiKey: String) {
         myInfo: String,
         vrchatUserInfo: VrcUserInfo
     ): CompatibilityResult = withContext(Dispatchers.IO) {
+        // Perform analysis via the OpenAI API
         val prompt = createPrompt(myInfo, vrchatUserInfo)
         val requestBody = createRequestBody(prompt)
 
