@@ -162,7 +162,7 @@ class OpenAiClient(private val apiKey: String) {
      */
     private fun createRequestBody(prompt: String): String {
         val requestJsonObject = buildJsonObject {
-            put("model", "gpt-4o")
+            put("model", "gpt-4.5-preview-2025-02-27")
             put("input", prompt)
 
             putJsonObject("text") {
