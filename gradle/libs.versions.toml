@@ -9,6 +9,7 @@ kotlinxSerializationJSON = "1.8.0"
 kotlinxCoroutines = "1.8.1"
 ktorVersion = "3.1.1"
 sqlDelightVersion = "2.0.2"
+logbackClassicVersion = "1.5.18"
 
 [libraries]
 kotlinxDatetime = { module = "org.jetbrains.kotlinx:kotlinx-datetime", version.ref = "kotlinxDatetime" }
@@ -18,6 +19,8 @@ ktorClientCore = { module = "io.ktor:ktor-client-core", version.ref = "ktorVersi
 ktorClientCio = { module = "io.ktor:ktor-client-cio", version.ref = "ktorVersion" }
 ktorClientContentNegotiation = { module = "io.ktor:ktor-client-content-negotiation", version.ref = "ktorVersion" }
 ktorClientAuth = { module = "io.ktor:ktor-client-auth", version.ref = "ktorVersion" }
+ktorClientLogging = { module = "io.ktor:ktor-client-logging", version.ref = "ktorVersion" }
+logbackClassic = { module = "ch.qos.logback:logback-classic", version.ref = "logbackClassicVersion" }
 sqlDelight = { module = "app.cash.sqldelight:sqlite-driver", version.ref = "sqlDelightVersion" }
 
 # Libraries can be bundled together for easier import

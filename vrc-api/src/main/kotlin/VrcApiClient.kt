@@ -1,7 +1,6 @@
 package com.kemonotigris
 
 import io.ktor.client.HttpClient
-import io.ktor.client.call.body
 import io.ktor.client.engine.cio.CIO
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.plugins.defaultRequest
@@ -15,7 +14,11 @@ import io.ktor.client.request.setBody
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
 import io.ktor.http.contentType
+import java.io.File
 import java.time.Instant
+import java.time.ZonedDateTime
+import java.time.format.DateTimeFormatter
+import java.time.temporal.ChronoUnit
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -30,7 +33,7 @@ data class VrcUserInfo(
     val bioLinks: List<String>? = null,
     val currentAvatarImageUrl: String? = null,
     val currentAvatarThumbnailImageUrl: String? = null,
-    val status: String? = null,
+    val statusDescription: String? = null,
     val isFriend: Boolean = false,
     val lastLogin: String? = null
 )
@@ -46,14 +49,30 @@ data class ErrorDetail(
     val status_code: Int
 )
 
+// Existing data classes (unchanged)
+
+@Serializable
+data class AuthVerificationResponse(
+    val ok: Boolean,
+    val token: String? = null
+)
+
 class VrcApiClient(
     private val username: String,
-    private val password: String
+    private val password: String,
+    private val cookieStoragePath: String = "vrc_auth_cookie.txt" // File to store the cookie
 ) {
     private val mutex = Mutex()
     private var lastRequestTime = 0L
-    private var authCookie: String? = ""
+    private var authCookie: String? = null
+    private var cookieExpiresAt: Long? = null // Store expiration timestamp
     private val baseUrl = "https://api.vrchat.cloud/api/1"
+    private val jsonConfig = Json {
+        ignoreUnknownKeys = true
+        coerceInputValues = true
+        prettyPrint = true
+        isLenient = true
+    }
 
     private val client = HttpClient(CIO) {
         install(ContentNegotiation) {
@@ -65,7 +84,7 @@ class VrcApiClient(
             }
         }
         install(Logging) {
-            level = io.ktor.client.plugins.logging.LogLevel.ALL  // Log everything: headers, body, etc.
+            level = io.ktor.client.plugins.logging.LogLevel.ALL
         }
         defaultRequest {
             url(baseUrl)
@@ -73,41 +92,127 @@ class VrcApiClient(
         }
     }
 
+    init {
+        // Load saved cookie on initialization
+        loadSavedCookie()
+    }
+
+    private fun loadSavedCookie() {
+        try {
+            val file = File(cookieStoragePath)
+            if (file.exists()) {
+                val lines = file.readLines()
+                if (lines.size >= 2) {
+                    authCookie = lines[0]
+                    cookieExpiresAt = lines[1].toLongOrNull()
+                    println("Loaded saved auth cookie, expires: ${cookieExpiresAt?.let { Instant.ofEpochMilli(it) }}")
+                }
+            }
+        } catch (e: Exception) {
+            println("Failed to load saved cookie: ${e.message}")
+            authCookie = null
+            cookieExpiresAt = null
+        }
+    }
+
+    private fun saveCookie(cookie: String, expiryTimestamp: Long) {
+        try {
+            val file = File(cookieStoragePath)
+            file.writeText("$cookie\n$expiryTimestamp")
+            println("Auth cookie saved successfully")
+        } catch (e: Exception) {
+            println("Failed to save auth cookie: ${e.message}")
+        }
+    }
+
+    /**
+     * Checks if the current auth token is valid by calling the /auth endpoint.
+     */
+    suspend fun isAuthTokenValid(): Boolean {
+        return verifyAuthCookie()
+    }
+
+    private suspend fun verifyAuthCookie(): Boolean {
+        try {
+            if (authCookie == null) return false
+
+            val response = client.get("$baseUrl/auth") {
+                header("Cookie", "auth=$authCookie")
+            }
+
+            if (response.status.value in 200..299) {
+                val responseText = response.bodyAsText()
+                val authResponse = jsonConfig.decodeFromString<AuthVerificationResponse>(responseText)
+                return authResponse.ok
+            }
+        } catch (e: Exception) {
+            println("Failed to verify auth cookie: ${e.message}")
+        }
+        return false
+    }
 
     private suspend fun ensureAuthenticated() {
+        // First check if we have a non-expired cookie
+        if (authCookie != null && cookieExpiresAt != null) {
+            val now = Instant.now().toEpochMilli()
+
+            // Only verify if the cookie hasn't expired based on our stored expiry
+            if (cookieExpiresAt!! > now && verifyAuthCookie()) {
+                println("Using saved auth cookie")
+                return
+            }
+
+            println("Saved auth cookie is expired or invalid, re-authenticating...")
+        }
+
         println("Attempting authentication...")
         val response = client.get("$baseUrl/auth/user") {
             basicAuth(username, password)
         }
 
         if (response.status.value in 200..299) {
-            // Parse the response to check for 2FA requirement
-            val responseText = response.body<String>()
-            println("Auth response body: $responseText")
+            val responseText = response.bodyAsText()
 
-            // Temporarily store the response for use in completeEmailOtpVerification
+            // Extract cookie from response headers
             val setCookieHeader = response.headers["Set-Cookie"]
-            val initialAuthCookie = setCookieHeader?.split(";")?.firstOrNull {
+            println("Set-Cookie header: $setCookieHeader")
+
+            val extractedCookie = setCookieHeader?.split(";")?.firstOrNull {
                 it.trim().startsWith("auth=")
             }?.trim()?.removePrefix("auth=")
 
-            // Store this temporarily
-            authCookie = initialAuthCookie
+            // Extract expiry date from Set-Cookie header
+            val expiryStr = setCookieHeader?.split(";")?.firstOrNull {
+                it.trim().lowercase().startsWith("expires=")
+            }?.trim()?.removePrefix("Expires=")
+
+            // Parse expiry date or use a default (one year)
+            val expiry = if (expiryStr != null) {
+                try {
+                    val formatter = DateTimeFormatter.RFC_1123_DATE_TIME
+                    val dateTime = ZonedDateTime.parse(expiryStr, formatter)
+                    dateTime.toInstant().toEpochMilli()
+                } catch (e: Exception) {
+                    println("Failed to parse cookie expiry date: $expiryStr, error: ${e.message}")
+                    Instant.now().plus(365, ChronoUnit.DAYS).toEpochMilli()
+                }
+            } else {
+                Instant.now().plus(365, ChronoUnit.DAYS).toEpochMilli()
+            }
+
+            // Store the cookie temporarily
+            authCookie = extractedCookie
+            cookieExpiresAt = expiry
 
             if (responseText.contains("requiresTwoFactorAuth")) {
-                // Need to do 2FA verification
                 println("2FA is required for this account.")
                 completeEmailOtpVerification()
                 return
             }
 
-            // Normal authentication, extract cookie
-            println("Auth response status: ${response.status}")
-            println("Set-Cookie header: $setCookieHeader")
-
-            if (initialAuthCookie != null) {
-                // We've already stored the cookie above
-                println("Authentication successful. Auth cookie: $authCookie")
+            if (extractedCookie != null) {
+                println("Authentication successful. Auth cookie expires: ${Instant.ofEpochMilli(expiry)}")
+                saveCookie(extractedCookie, expiry)
             } else {
                 println("Authentication response didn't contain auth cookie")
                 throw Exception("Failed to extract auth cookie from response")
@@ -119,7 +224,6 @@ class VrcApiClient(
     }
 
     private suspend fun completeEmailOtpVerification() {
-        // We need to reference the authCookie that was stored in ensureAuthenticated
         val initialAuthCookie = authCookie
 
         if (initialAuthCookie == null) {
@@ -131,17 +235,11 @@ class VrcApiClient(
         println("Please check your email and enter the verification code:")
         val otpCode = readlnOrNull() ?: ""
 
-        // Use a raw JSON string
         val jsonBody = """{"code":"$otpCode"}"""
 
-        // According to the docs, we need to use the cookie from the initial response
         val response = client.post("$baseUrl/auth/twofactorauth/emailotp/verify") {
             contentType(ContentType.Application.Json)
-
-            // Use cookie auth instead of basic auth
             header("Cookie", "auth=$initialAuthCookie")
-
-            // Use a raw JSON string for the body
             setBody(jsonBody)
         }
 
@@ -151,21 +249,41 @@ class VrcApiClient(
             val newSetCookieHeader = response.headers["Set-Cookie"]
             println("2FA verification Set-Cookie header: $newSetCookieHeader")
 
-            // Extract the auth cookie from the 2FA response
-            val authCookieValue = newSetCookieHeader?.split(";")?.firstOrNull {
+            // Extract new cookie and expiry
+            val newAuthCookie = newSetCookieHeader?.split(";")?.firstOrNull {
                 it.trim().startsWith("auth=")
             }?.trim()?.removePrefix("auth=")
 
-            if (authCookieValue != null) {
-                authCookie = authCookieValue
-                println("2FA verification successful. Auth cookie: $authCookie")
+            // Extract expiry date from Set-Cookie header
+            val expiryStr = newSetCookieHeader?.split(";")?.firstOrNull {
+                it.trim().lowercase().startsWith("expires=")
+            }?.trim()?.removePrefix("Expires=")
+
+            val expiry = if (expiryStr != null) {
+                try {
+                    val formatter = DateTimeFormatter.RFC_1123_DATE_TIME
+                    val dateTime = ZonedDateTime.parse(expiryStr, formatter)
+                    dateTime.toInstant().toEpochMilli()
+                } catch (e: Exception) {
+                    println("Failed to parse cookie expiry date: $expiryStr")
+                    Instant.now().plus(365, ChronoUnit.DAYS).toEpochMilli()
+                }
             } else {
-                // If no new cookie is provided, we keep using the initial one
-                println("No new cookie provided after 2FA verification. Keeping initial cookie: $initialAuthCookie")
+                Instant.now().plus(365, ChronoUnit.DAYS).toEpochMilli()
+            }
+
+            if (newAuthCookie != null) {
+                authCookie = newAuthCookie
+                cookieExpiresAt = expiry
+                println("2FA verification successful. New auth cookie expires: ${Instant.ofEpochMilli(expiry)}")
+                saveCookie(newAuthCookie, expiry)
+            } else {
+                println("No new cookie provided after 2FA verification. Keeping initial cookie.")
+                saveCookie(initialAuthCookie, expiry)
             }
         } else {
             println("2FA verification failed with status: ${response.status}")
-            val errorBody = response.body<String>()
+            val errorBody = response.bodyAsText()
             println("Error response: $errorBody")
             throw Exception("2FA verification failed: ${response.status}")
         }
@@ -187,7 +305,8 @@ class VrcApiClient(
     suspend fun getUserInfo(userId: String): VrcUserInfo {
         rateLimit()
 
-        if (authCookie == null) {
+        // Ensure we have a valid auth cookie before making the request
+        if (authCookie == null || !verifyAuthCookie()) {
             ensureAuthenticated()
         }
 
@@ -198,24 +317,16 @@ class VrcApiClient(
             val response = client.get("$baseUrl/users/$userId") {
                 contentType(ContentType.Application.Json)
                 header("Cookie", "auth=$authCookie")
-                accept(ContentType.Application.Json)  // Add this to ensure correct Accept header
+                accept(ContentType.Application.Json)
             }
 
             println("User info response status: ${response.status}")
             if (response.status.value in 200..299) {
-                // Parse the response as String first to debug
                 val responseText = response.bodyAsText()
-                println("User info response body: ${responseText.take(100)}...")  // Print first 100 chars
-
-                // Try manually deserializing with kotlinx.serialization
-                return Json {
-                    ignoreUnknownKeys = true
-                    isLenient = true
-                    coerceInputValues = true
-                }.decodeFromString(responseText)
+                return jsonConfig.decodeFromString(responseText)
             } else {
                 try {
-                    val errorResponse = response.body<ErrorResponse>()
+                    val errorResponse = jsonConfig.decodeFromString<ErrorResponse>(response.bodyAsText())
                     throw Exception("API error: ${errorResponse.error.message} (${errorResponse.error.status_code})")
                 } catch (e: Exception) {
                     throw Exception("Failed to get user info: ${response.status}")

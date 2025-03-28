@@ -12,6 +12,7 @@ repositories {
 dependencies {
     implementation(projects.config)
     implementation(projects.vrcApi)
+    implementation(projects.openaiApi)
     implementation(projects.database)
 
     testImplementation(kotlin("test"))

@@ -1,7 +1,5 @@
 package com.kemonotigris
 
-//TIP To <b>Run</b> code, press <shortcut actionId="Run"/> or
-// click the <icon src="AllIcons.Actions.Execute"/> icon in the gutter.
 suspend fun main() {
     val config = loadProperties()
     val database = DatabaseFactory.getDatabase()
@@ -10,67 +8,63 @@ suspend fun main() {
         password = config.getProperty("vrc.password")
     )
 
-    val userId = "usr_889bfa25-cdff-498f-a175-95aa9d87e9d8"
+    // Create OpenAI client
+    val openAiClient = OpenAiClient(
+        apiKey = config.getProperty("openai.apikey")
+    )
 
-    // Check if user exists in database
-    val existingUser = database.vrchatUserQueries.selectUserById(userId).executeAsOneOrNull()
+    try {
+        val userId = "usr_889bfa25-cdff-498f-a175-95aa9d87e9d8"
 
-    println("Database query executed. User exists: ${existingUser != null}")
+        // Check if user exists in database
+        val existingUser = database.vrchatUserQueries.selectUserById(userId).executeAsOneOrNull()
 
-    if (existingUser == null) {
-        println("User doesn't exist in DB, fetching from API...")
-        val userInfo = vrcApiClient.getUserInfo(userId)
-        println("API returned user: $userInfo")
+        println("Database query executed. User exists: ${existingUser != null}")
 
-        val bioLinksString = userInfo.bioLinks?.joinToString(",") ?: ""
-        val isFriendLong = if (userInfo.isFriend) 1L else 0L
-
-        try {
-            database.vrchatUserQueries.insertOrReplaceUser(
-                userInfo.id,
-                userInfo.displayName,
-                userInfo.bio,
-                bioLinksString,
-                userInfo.currentAvatarImageUrl,
-                userInfo.currentAvatarThumbnailImageUrl,
-                userInfo.status,
-                isFriendLong,
-                userInfo.lastLogin ?: "", // Handle null lastLogin
-                System.currentTimeMillis()
+        // Get user info either from database or API
+        val userInfo = if (existingUser == null) {
+            // Fetch from API and insert into database (your existing code)
+            vrcApiClient.getUserInfo(userId)
+        } else {
+            // Convert database user to VrcUserInfo
+            VrcUserInfo(
+                id = existingUser.id,
+                displayName = existingUser.name,
+                bio = existingUser.bio,
+                bioLinks = existingUser.bioLinks?.split(",")?.filter { it.isNotEmpty() },
+                currentAvatarImageUrl = existingUser.avatar_image_url,
+                currentAvatarThumbnailImageUrl = existingUser.avatar_thumbnail_url,
+                statusDescription = existingUser.statusDescription,
+                isFriend = existingUser.is_friend == 1L,
+                lastLogin = existingUser.last_login
             )
-            println("User successfully inserted into database")
-        } catch (e: Exception) {
-            println("Error inserting user into database: ${e.message}")
-            e.printStackTrace()
         }
-    } else {
-        println("User found in database:")
-        println("- ID: ${existingUser.id}")
-        println("- Name: ${existingUser.name}")
-        println("- Bio: ${existingUser.bio}")
-        println("- BioLinks: ${existingUser.bioLinks}")
-        println("- Avatar URL: ${existingUser.avatar_image_url}")
-        println("- Status: ${existingUser.status}")
-        println("- Is Friend: ${existingUser.is_friend}")
-        println("- Last Login: ${existingUser.last_login}")
-        println("- Last Updated: ${existingUser.last_updated}")
-    }
 
-    // Query again to verify
-    val userDetails = database.vrchatUserQueries.selectUserById(userId).executeAsOneOrNull()
+        // Information about myself to compare with the VRChat user
+        val myInfo = """
+            I'm a tech enthusiast passionate about AI and VR technologies. I enjoy deep conversations
+            about technology, innovation, and how they impact society. I'm interested in machine learning,
+            programming, and creating digital experiences. I'm also into gaming and exploring the creative
+            potential of virtual worlds.
+        """.trimIndent()
 
-    if (userDetails != null) {
-        println("\nFinal query result:")
-        println("- ID: ${userDetails.id}")
-        println("- Name: ${userDetails.name}")
-        println("- Bio: ${userDetails.bio}")
-        println("- BioLinks: ${userDetails.bioLinks}")
-        println("- Avatar URL: ${userDetails.avatar_image_url}")
-        println("- Status: ${userDetails.status}")
-        println("- Is Friend: ${userDetails.is_friend}")
-        println("- Last Login: ${userDetails.last_login}")
-        println("- Last Updated: ${userDetails.last_updated}")
-    } else {
-        println("Final query returned null")
+        // Analyze compatibility
+        val compatibilityResult = openAiClient.analyzeCompatibility(myInfo, userInfo)
+
+        println("\n===== COMPATIBILITY ANALYSIS =====")
+        println("Compatibility Score: ${compatibilityResult.compatibilityScore}/100")
+        println("\nReasoning:")
+        println(compatibilityResult.compatibilityReason)
+        println("\nSuggested Questions:")
+        compatibilityResult.suggestedQuestions.forEachIndexed { index, question ->
+            println("${index + 1}. $question")
+        }
+        println("==================================")
+    } catch (e: Exception) {
+        println("Error analyzing compatibility: ${e.message}")
+        e.printStackTrace()
+    } finally {
+        // Clean up resources
+        openAiClient.close()
     }
 }

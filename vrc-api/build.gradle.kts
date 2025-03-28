@@ -16,7 +16,8 @@ dependencies {
     implementation(libs.ktorClientCio)
     implementation(libs.ktorClientContentNegotiation)
     implementation(libs.ktorClientAuth)
-    implementation("io.ktor:ktor-client-logging:3.1.1")
+
+    implementation(libs.ktorClientLogging)
 
 
     // Coroutines
@@ -24,7 +25,8 @@ dependencies {
 
     // Serialization
     implementation(libs.kotlinxSerialization)
-    implementation("ch.qos.logback:logback-classic:1.4.12")
+    // logging
+    implementation(libs.logbackClassic)
 
 
 

@@ -5,7 +5,7 @@ CREATE TABLE IF NOT EXISTS user (
     bioLinks TEXT,
     avatar_image_url TEXT,
     avatar_thumbnail_url TEXT,
-    status TEXT,
+    statusDescription TEXT,
     is_friend INTEGER,  -- SQLite doesn't have a boolean type, use INTEGER (0/1)
     last_login TEXT,
     last_updated INTEGER  -- store as epoch millis
@@ -20,7 +20,7 @@ INSERT OR REPLACE INTO user (
     bioLinks,
     avatar_image_url,
     avatar_thumbnail_url,
-    status,
+    statusDescription,
     is_friend,
     last_login,
     last_updated
@@ -33,19 +33,6 @@ WHERE id = ?;
 
 selectAllUsers:
 SELECT * FROM user;
-
-selectFriends:
-SELECT * FROM user
-WHERE is_friend = 1;
-
-selectUsersByStatus:
-SELECT * FROM user
-WHERE status = ?;
-
-updateUserLastUpdated:
-UPDATE user
-SET last_updated = ?
-WHERE id = ?;
 
 -- Utility queries for time-based operations
 selectUsersUpdatedBefore:
