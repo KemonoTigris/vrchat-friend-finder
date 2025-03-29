@@ -17,6 +17,7 @@ dependencies {
     implementation(projects.openaiApi)
     implementation(projects.database)
     implementation(projects.server)
+    implementation(projects.logWatcher)
 
     testImplementation(kotlin("test"))
 }

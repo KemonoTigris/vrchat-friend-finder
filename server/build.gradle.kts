@@ -24,6 +24,7 @@ dependencies {
     implementation(libs.ktorServerJsonSerialization)
 
     implementation(projects.database)
+    implementation(projects.openaiApi)
 
     testImplementation(kotlin("test"))
 }

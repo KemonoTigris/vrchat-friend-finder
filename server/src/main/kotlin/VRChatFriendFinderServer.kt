@@ -38,6 +38,7 @@ data class UserCompatibilityView(
  */
 class VRChatFriendFinderServer(
     private val usersInInstanceFlow: Flow<Set<String>>,
+    private val compatibilityResultsFlow: Flow<Map<String, OpenAiClient.CompatibilityResult>>,
     private val database: Database,
     private val serverPort: Int = 8080
 ) {
@@ -60,15 +61,36 @@ class VRChatFriendFinderServer(
             routing {
                 // Endpoint to get users currently in the instance with their compatibility data
                 get("/api/users") {
-                    val userIds = usersInInstanceFlow.first()
-                    val userList = getUserCompatibilityData(userIds)
-                    call.respond(userList)
+                    val currentUsers = usersInInstanceFlow.first()
+                    val compatibilityResults = compatibilityResultsFlow.first()
+
+                    // Transform to a list of UserCompatibilityView objects
+                    val usersList = currentUsers.mapNotNull { userId ->
+                        val userInfo = database.vrchatUserQueries.selectUserById(userId).executeAsOneOrNull()
+                        val compatibility = compatibilityResults[userId]
+
+                        if (userInfo != null) {
+                            UserCompatibilityView(
+                                userId = userId,
+                                userName = userInfo.name ?: "unknown",
+                                bio = userInfo.bio,
+                                avatarUrl = userInfo.avatar_thumbnail_url,
+                                compatibilityScore = compatibility?.compatibilityScore ?: 0,
+                                compatibilityReason = compatibility?.compatibilityReason ?: "Analyzing...",
+                                suggestedQuestions = compatibility?.suggestedQuestions ?: emptyList(),
+                                lastUpdated = userInfo.last_updated ?: 0L
+                            )
+                        } else null
+                    }
+
+                    // Use a properly serializable wrapper class
+                    call.respond(mapOf("users" to usersList))
                 }
 
                 // Endpoint to get all compatibility data regardless of who's in instance
                 get("/api/all-users") {
                     val allUsers = getAllUserCompatibilityData()
-                    call.respond(allUsers)
+                    call.respond(mapOf("users" to allUsers))
                 }
 
                 // Serve static web files

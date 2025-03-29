@@ -187,7 +187,19 @@
                     throw new Error(`Network response was not ok: ${response.status}`);
                 }
 
-                const users = await response.json();
+                const data = await response.json();
+                console.log("API response:", data); // Debug log
+
+                // Correctly extract the users array
+                const users = data.users || [];
+
+                // Fix sorting error - check if users is an array before sorting
+                if (!Array.isArray(users)) {
+                    console.error("Expected 'users' to be an array, got:", users);
+                    statusElement.textContent = "Status: Error - Invalid data format";
+                    return;
+                }
+
                 renderUsers(users);
 
                 const viewType = currentView === 'current' ? 'instance' : 'database';

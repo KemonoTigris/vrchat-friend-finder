@@ -3,6 +3,7 @@ package com.kemonotigris
 import java.text.SimpleDateFormat
 import java.util.Date
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.flowOf
 
 /**
  * Helper function to format a timestamp (in milliseconds) to a human-readable date string
@@ -171,6 +172,7 @@ suspend fun main() {
     // Then start the server
     val server = VRChatFriendFinderServer(
         usersInInstanceFlow = usersInInstanceFlow,
+        compatibilityResultsFlow = flowOf(),
         database = database,
         serverPort = 8080
     )
