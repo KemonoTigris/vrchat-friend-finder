@@ -27,13 +27,7 @@ suspend fun main() {
         apiKey = config.getProperty("openai.apikey")
     )
 
-    // My personal bio for compatibility matching
-    val myInfo = """
-        I'm a tech enthusiast passionate about AI and VR technologies. I enjoy deep conversations
-        about technology, innovation, and how they impact society. I'm interested in machine learning,
-        programming, and creating digital experiences. I'm also into gaming and exploring the creative
-        potential of virtual worlds.
-    """.trimIndent()
+    val myInfo = config.getProperty("myinfo")
 
     // Create the compatibility service
     val compatibilityService = CompatibilityService(
