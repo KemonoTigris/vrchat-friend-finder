@@ -13,8 +13,12 @@ import io.ktor.server.plugins.cors.routing.CORS
 import io.ktor.server.response.respond
 import io.ktor.server.routing.get
 import io.ktor.server.routing.routing
+import io.ktor.server.sse.SSE
+import io.ktor.server.sse.sse
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
@@ -44,6 +48,7 @@ class VRChatFriendFinderServer(
 ) {
     fun start() {
         embeddedServer(Netty, port = serverPort, host = "0.0.0.0") {
+            install(SSE)
             // Set up CORS to allow browser access
             install(CORS) {
                 anyHost()
@@ -91,6 +96,49 @@ class VRChatFriendFinderServer(
                 get("/api/all-users") {
                     val allUsers = getAllUserCompatibilityData()
                     call.respond(mapOf("users" to allUsers))
+                }
+
+                sse("/api/updates/current-instance") {
+                    // Combine both flows to create a single flow of updates
+                    val updatesFlow = combine(
+                        usersInInstanceFlow,
+                        compatibilityResultsFlow
+                    ) { users, compatibility ->
+                        val usersList = users.mapNotNull { userId ->
+                            val userInfo = database.vrchatUserQueries.selectUserById(userId).executeAsOneOrNull()
+                            val compat = compatibility[userId]
+
+                            if (userInfo != null) {
+                                UserCompatibilityView(
+                                    userId = userId,
+                                    userName = userInfo.name ?: "unknown",
+                                    bio = userInfo.bio,
+                                    avatarUrl = userInfo.avatar_thumbnail_url,
+                                    compatibilityScore = compat?.compatibilityScore ?: 0,
+                                    compatibilityReason = compat?.compatibilityReason ?: "Analyzing...",
+                                    suggestedQuestions = compat?.suggestedQuestions ?: emptyList(),
+                                    lastUpdated = userInfo.last_updated ?: 0L
+                                )
+                            } else null
+                        }
+                        mapOf("users" to usersList)
+                    }
+
+                    // Emit each update as an SSE event
+                    updatesFlow.collect { update ->
+                        send(Json.encodeToString(update))
+                    }
+                }
+
+                sse("/api/updates/all-users") {
+                    // This will emit whenever compatibility data changes
+                    compatibilityResultsFlow.map { _ ->
+                        // Get all users from the database
+                        val allUsers = getAllUserCompatibilityData()
+                        mapOf("users" to allUsers)
+                    }.collect { update ->
+                        send(Json.encodeToString(update))
+                    }
                 }
 
                 // Serve static web files

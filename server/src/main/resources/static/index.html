@@ -159,24 +159,72 @@
         const allUsersTab = document.getElementById('allUsersTab');
 
         let currentView = 'current'; // 'current' or 'all'
-        let pollInterval = null;
+        let eventSource = null;
 
         // Set up tab switching
         currentUsersTab.addEventListener('click', () => {
             currentView = 'current';
             currentUsersTab.classList.add('active');
             allUsersTab.classList.remove('active');
-            fetchUsers();
+            setupSSE();
         });
 
         allUsersTab.addEventListener('click', () => {
             currentView = 'all';
             allUsersTab.classList.add('active');
             currentUsersTab.classList.remove('active');
-            fetchUsers();
+            setupSSE();
         });
 
-        // Function to fetch users
+        // Function to set up Server-Sent Events connection
+        function setupSSE() {
+            // Close any existing SSE connection
+            if (eventSource) {
+                eventSource.close();
+                eventSource = null;
+            }
+
+            // Initial fetch to show data immediately
+            fetchUsers();
+
+            // Determine which SSE endpoint to connect to
+            const endpoint = currentView === 'current'
+                ? '/api/updates/current-instance'
+                : '/api/updates/all-users';
+
+            // Create new EventSource connection
+            eventSource = new EventSource(endpoint);
+
+            // Handle incoming messages
+            eventSource.onmessage = (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    console.log("SSE update received:", data);
+
+                    if (data.users) {
+                        renderUsers(data.users);
+                        const viewType = currentView === 'current' ? 'instance' : 'database';
+                        statusElement.textContent = `Status: Live - ${data.users.length} users in ${viewType}`;
+                    }
+                } catch (error) {
+                    console.error('Error processing SSE update:', error);
+                }
+            };
+
+            // Handle connection open
+            eventSource.onopen = () => {
+                statusElement.textContent = 'Status: Connected - Waiting for data...';
+            };
+
+            // Handle connection errors
+            eventSource.onerror = (error) => {
+                console.error('SSE connection error:', error);
+                statusElement.textContent = 'Status: Connection lost, reconnecting...';
+                // EventSource will automatically try to reconnect
+            };
+        }
+
+        // Function to fetch users initially
         async function fetchUsers() {
             try {
                 statusElement.textContent = 'Status: Fetching users...';
@@ -214,18 +262,6 @@
         function formatTimestamp(timestamp) {
             const date = new Date(timestamp);
             return date.toLocaleString();
-        }
-
-        // Set up polling
-        function startPolling() {
-            // Clear any existing poll
-            if (pollInterval) clearInterval(pollInterval);
-
-            // Fetch immediately
-            fetchUsers();
-
-            // Then set up interval
-            pollInterval = setInterval(fetchUsers, 5000); // Poll every 5 seconds
         }
 
         function renderUsers(users) {
@@ -289,8 +325,8 @@
             });
         }
 
-        // Start the polling when the page loads
-        startPolling();
+        // Start the SSE connection when the page loads
+        setupSSE();
     });
 </script>
 </body>
