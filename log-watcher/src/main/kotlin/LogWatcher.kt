@@ -38,7 +38,7 @@ class LogWatcher() {
     }
 
     private fun getLatestLogFile(dir: File): File? {
-        println("Looking for latest log file in directory: ${dir.absolutePath}")
+//        println("Looking for latest log file in directory: ${dir.absolutePath}")
         // Define a regex pattern for log file names in the expected format.
         val logFileRegex = Regex("output_log_(\\d{4}-\\d{2}-\\d{2}_\\d{2}-\\d{2}-\\d{2})\\.txt")
         // Define a formatter matching the date-time part in the filename.
