@@ -28,7 +28,7 @@ class OpenAiClient(private val apiKey: String) {
 
     private val client = HttpClient(CIO) {
         install(HttpTimeout) {
-            requestTimeoutMillis = 30000
+            requestTimeoutMillis = 300000
             connectTimeoutMillis = 30000
             socketTimeoutMillis = 30000
         }
