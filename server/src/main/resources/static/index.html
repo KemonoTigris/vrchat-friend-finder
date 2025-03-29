@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VRChat Friend Finder</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #121212;
+            color: #e0e0e0;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        h1 {
+            color: #bb86fc;
+            margin-bottom: 20px;
+        }
+        .user-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+            gap: 20px;
+        }
+        .user-card {
+            background-color: #1e1e1e;
+            border-radius: 8px;
+            padding: 15px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            display: flex;
+            flex-direction: column;
+        }
+        .user-header {
+            display: flex;
+            margin-bottom: 15px;
+        }
+        .user-avatar {
+            width: 80px;
+            height: 80px;
+            border-radius: 8px;
+            background-color: #333;
+            object-fit: cover;
+            margin-right: 15px;
+            flex-shrink: 0;
+        }
+        .user-info {
+            flex-grow: 1;
+        }
+        .user-name {
+            font-size: 18px;
+            font-weight: bold;
+            color: #03dac6;
+            margin-bottom: 5px;
+        }
+        .user-id {
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 5px;
+            word-break: break-all;
+        }
+        .user-bio {
+            font-size: 14px;
+            margin-bottom: 15px;
+            max-height: 80px;
+            overflow-y: auto;
+            background-color: #252525;
+            padding: 8px;
+            border-radius: 4px;
+        }
+        .compatibility-score {
+            background-color: #3700b3;
+            color: white;
+            padding: 5px 10px;
+            border-radius: 4px;
+            display: inline-block;
+            margin-bottom: 10px;
+        }
+        .compatibility-reason {
+            margin-bottom: 15px;
+            line-height: 1.4;
+            max-height: 150px;
+            overflow-y: auto;
+        }
+        .suggested-questions {
+            background-color: #252525;
+            padding: 10px;
+            border-radius: 4px;
+            flex-grow: 1;
+        }
+        .suggested-questions h4 {
+            color: #bb86fc;
+            margin-top: 0;
+            margin-bottom: 8px;
+        }
+        .suggested-questions ul {
+            margin: 0;
+            padding-left: 20px;
+        }
+        .suggested-questions li {
+            margin-bottom: 8px;
+        }
+        .status {
+            background-color: #1e1e1e;
+            padding: 10px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+        }
+        .tabs {
+            display: flex;
+            margin-bottom: 20px;
+        }
+        .tab {
+            padding: 10px 20px;
+            background-color: #1e1e1e;
+            color: #e0e0e0;
+            border: none;
+            cursor: pointer;
+            margin-right: 5px;
+            border-radius: 4px 4px 0 0;
+        }
+        .tab.active {
+            background-color: #3700b3;
+            color: white;
+        }
+        .last-updated {
+            font-size: 12px;
+            color: #666;
+            text-align: right;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>VRChat Friend Finder</h1>
+
+    <div class="status" id="status">
+        Status: Loading...
+    </div>
+
+    <div class="tabs">
+        <button class="tab active" id="currentUsersTab">Current Instance</button>
+        <button class="tab" id="allUsersTab">All Users</button>
+    </div>
+
+    <div class="user-grid" id="userGrid">
+        <!-- User cards will be populated here -->
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const userGrid = document.getElementById('userGrid');
+        const statusElement = document.getElementById('status');
+        const currentUsersTab = document.getElementById('currentUsersTab');
+        const allUsersTab = document.getElementById('allUsersTab');
+
+        let currentView = 'current'; // 'current' or 'all'
+        let pollInterval = null;
+
+        // Set up tab switching
+        currentUsersTab.addEventListener('click', () => {
+            currentView = 'current';
+            currentUsersTab.classList.add('active');
+            allUsersTab.classList.remove('active');
+            fetchUsers();
+        });
+
+        allUsersTab.addEventListener('click', () => {
+            currentView = 'all';
+            allUsersTab.classList.add('active');
+            currentUsersTab.classList.remove('active');
+            fetchUsers();
+        });
+
+        // Function to fetch users
+        async function fetchUsers() {
+            try {
+                statusElement.textContent = 'Status: Fetching users...';
+                const endpoint = currentView === 'current' ? '/api/users' : '/api/all-users';
+                const response = await fetch(endpoint);
+
+                if (!response.ok) {
+                    throw new Error(`Network response was not ok: ${response.status}`);
+                }
+
+                const users = await response.json();
+                renderUsers(users);
+
+                const viewType = currentView === 'current' ? 'instance' : 'database';
+                statusElement.textContent = `Status: Connected - ${users.length} users in ${viewType}`;
+            } catch (error) {
+                console.error('Error fetching users:', error);
+                statusElement.textContent = `Status: Error - ${error.message}`;
+            }
+        }
+
+        // Format timestamp for display
+        function formatTimestamp(timestamp) {
+            const date = new Date(timestamp);
+            return date.toLocaleString();
+        }
+
+        // Set up polling
+        function startPolling() {
+            // Clear any existing poll
+            if (pollInterval) clearInterval(pollInterval);
+
+            // Fetch immediately
+            fetchUsers();
+
+            // Then set up interval
+            pollInterval = setInterval(fetchUsers, 5000); // Poll every 5 seconds
+        }
+
+        function renderUsers(users) {
+            userGrid.innerHTML = '';
+
+            if (users.length === 0) {
+                userGrid.innerHTML = '<p>No users found</p>';
+                return;
+            }
+
+            // Sort users by compatibility score (highest first)
+            users.sort((a, b) => b.compatibilityScore - a.compatibilityScore);
+
+            users.forEach(user => {
+                const card = document.createElement('div');
+                card.className = 'user-card';
+
+                // Default avatar if none available
+                const avatarUrl = user.avatarUrl || 'https://via.placeholder.com/80?text=No+Avatar';
+
+                // Create questions list
+                const questionsList = user.suggestedQuestions
+                    .map(q => `<li>${q}</li>`)
+                    .join('');
+
+                card.innerHTML = `
+                    <div class="user-header">
+                        <img class="user-avatar" src="${avatarUrl}" alt="Avatar">
+                        <div class="user-info">
+                            <div class="user-name">${user.userName}</div>
+                            <div class="user-id">${user.userId}</div>
+                            <div class="compatibility-score">
+                                Compatibility: ${user.compatibilityScore}%
+                            </div>
+                        </div>
+                    </div>
+
+                    ${user.bio ? `
+                    <div class="user-bio">
+                        ${user.bio}
+                    </div>
+                    ` : ''}
+
+                    <div class="compatibility-reason">
+                        ${user.compatibilityReason}
+                    </div>
+
+                    <div class="suggested-questions">
+                        <h4>Suggested Questions:</h4>
+                        <ul>${questionsList}</ul>
+                    </div>
+
+                    ${user.lastUpdated ? `
+                    <div class="last-updated">
+                        Analysis from: ${formatTimestamp(user.lastUpdated)}
+                    </div>
+                    ` : ''}
+                `;
+
+                userGrid.appendChild(card);
+            });
+        }
+
+        // Start the polling when the page loads
+        startPolling();
+    });
+</script>
+</body>
+</html>

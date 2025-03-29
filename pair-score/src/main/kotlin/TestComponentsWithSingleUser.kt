@@ -2,6 +2,7 @@ package com.kemonotigris
 
 import java.text.SimpleDateFormat
 import java.util.Date
+import kotlinx.coroutines.flow.MutableStateFlow
 
 /**
  * Helper function to format a timestamp (in milliseconds) to a human-readable date string
@@ -24,6 +25,11 @@ suspend fun main() {
     val openAiClient = OpenAiClient(
         apiKey = config.getProperty("openai.apikey")
     )
+
+    // Create a flow with a single test user
+    val testUserId = "usr_889bfa25-cdff-498f-a175-95aa9d87e9d8"
+    val usersInInstanceFlow = MutableStateFlow(setOf(testUserId))
+
 
     try {
         val userId = "usr_889bfa25-cdff-498f-a175-95aa9d87e9d8"
@@ -161,4 +167,14 @@ suspend fun main() {
         // Clean up resources
         openAiClient.close()
     }
+
+    // Then start the server
+    val server = VRChatFriendFinderServer(
+        usersInInstanceFlow = usersInInstanceFlow,
+        database = database,
+        serverPort = 8080
+    )
+
+    println("Starting VRChat Friend Finder web server on http://localhost:8080")
+    server.start()
 }

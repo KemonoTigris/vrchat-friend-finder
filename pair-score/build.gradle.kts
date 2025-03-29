@@ -10,10 +10,13 @@ repositories {
 }
 
 dependencies {
+    implementation(libs.kotlinxCoroutines)
+
     implementation(projects.config)
     implementation(projects.vrcApi)
     implementation(projects.openaiApi)
     implementation(projects.database)
+    implementation(projects.server)
 
     testImplementation(kotlin("test"))
 }

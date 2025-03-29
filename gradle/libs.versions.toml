@@ -21,6 +21,15 @@ ktorClientContentNegotiation = { module = "io.ktor:ktor-client-content-negotiati
 ktorClientAuth = { module = "io.ktor:ktor-client-auth", version.ref = "ktorVersion" }
 ktorClientLogging = { module = "io.ktor:ktor-client-logging", version.ref = "ktorVersion" }
 logbackClassic = { module = "ch.qos.logback:logback-classic", version.ref = "logbackClassicVersion" }
+
+ktorServerCore = { module = "io.ktor:ktor-server-core", version.ref = "ktorVersion" }
+ktorServerNetty = { module = "io.ktor:ktor-server-netty", version.ref = "ktorVersion" }
+ktorServerCors = { module = "io.ktor:ktor-server-cors", version.ref = "ktorVersion" }
+ktorServerSse = { module = "io.ktor:ktor-server-sse", version.ref = "ktorVersion" }
+ktorServerResources = { module = "io.ktor:ktor-server-resources", version.ref = "ktorVersion" }
+ktorServerContentNegotiation = { module = "io.ktor:ktor-server-content-negotiation", version.ref = "ktorVersion" }
+ktorServerJsonSerialization = { module = "io.ktor:ktor-serialization-kotlinx-json", version.ref = "ktorVersion" }
+
 sqlDelight = { module = "app.cash.sqldelight:sqlite-driver", version.ref = "sqlDelightVersion" }
 
 # Libraries can be bundled together for easier import
@@ -31,3 +40,4 @@ kotlinxEcosystem = ["kotlinxDatetime", "kotlinxSerialization", "kotlinxCoroutine
 kotlinJvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
 kotlinPluginSerialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
 sqlDelight = { id = "app.cash.sqldelight", version.ref = "sqlDelightVersion" }
+ktorServerPlugin = { id = "io.ktor.plugin", version.ref = "ktorVersion" }
