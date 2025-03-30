@@ -12,6 +12,8 @@ import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
 import java.io.IOException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -24,8 +26,10 @@ import kotlinx.serialization.json.putJsonObject
  * Client for interacting with OpenAI's Responses API to analyze compatibility
  * with VRChat users and generate conversation starters
  */
-class OpenAiClient(private val apiKey: String) {
-
+class OpenAiClient(
+    private val apiKey: String,
+    private val maxConcurrentRequests: Int = 20 // Default to 20 concurrent requests
+) {
     private val client = HttpClient(CIO) {
         install(HttpTimeout) {
             requestTimeoutMillis = 300000
@@ -40,9 +44,9 @@ class OpenAiClient(private val apiKey: String) {
         prettyPrint = true
     }
 
-    /**
-     * Result of compatibility analysis
-     */
+    // Semaphore to limit concurrent API calls
+    private val requestSemaphore = Semaphore(maxConcurrentRequests)
+
     @Serializable
     data class CompatibilityResult(
         val compatibilityScore: Int,
@@ -50,9 +54,6 @@ class OpenAiClient(private val apiKey: String) {
         val suggestedQuestions: List<String>
     )
 
-    /**
-     * OpenAI API response structure
-     */
     @Serializable
     data class OpenAiResponse(
         val id: String,
@@ -83,6 +84,7 @@ class OpenAiClient(private val apiKey: String) {
 
     /**
      * Analyzes compatibility between the user and a VRChat user
+     * Uses a semaphore to limit concurrent requests to maxConcurrentRequests
      *
      * @param myInfo Information about the user running the app
      * @param vrchatUserInfo Information about the VRChat user
@@ -92,49 +94,49 @@ class OpenAiClient(private val apiKey: String) {
         myInfo: String,
         vrchatUserInfo: VrcUserInfo
     ): CompatibilityResult = withContext(Dispatchers.IO) {
-        // Perform analysis via the OpenAI API
-        val prompt = createPrompt(myInfo, vrchatUserInfo)
-        val requestBody = createRequestBody(prompt)
+        // Use semaphore to limit concurrent requests
+        requestSemaphore.withPermit {
+            val prompt = createPrompt(myInfo, vrchatUserInfo)
+            val requestBody = createRequestBody(prompt)
 
-        try {
-            val response = client.post("https://api.openai.com/v1/responses") {
-                contentType(ContentType.Application.Json)
-                header("Authorization", "Bearer $apiKey")
-                setBody(requestBody)
+            try {
+                val response = client.post("https://api.openai.com/v1/responses") {
+                    contentType(ContentType.Application.Json)
+                    header("Authorization", "Bearer $apiKey")
+                    setBody(requestBody)
+                }
+
+                if (response.status != HttpStatusCode.OK) {
+                    val errorBody = response.bodyAsText()
+                    throw IOException("Unexpected response code: ${response.status}, message: $errorBody")
+                }
+
+                val responseBody = response.bodyAsText()
+                val openAiResponse = jsonFormat.decodeFromString<OpenAiResponse>(responseBody)
+
+                // Check if the API returned an error
+                if (openAiResponse.error != null) {
+                    throw IOException("OpenAI API error: ${openAiResponse.error.message}")
+                }
+
+                // Extract the structured JSON output from the response
+                val messageContent = openAiResponse.output
+                    .firstOrNull { it.type == "message" }
+                    ?.content
+                    ?.firstOrNull { it.type == "output_text" }
+                    ?.text
+                    ?: throw IOException("No valid output content found")
+
+                // Parse the JSON output into our model
+                jsonFormat.decodeFromString<CompatibilityResult>(messageContent)
+
+            } catch (e: Exception) {
+                throw IOException("Failed to get response from OpenAI API: ${e.message}", e)
             }
-
-            if (response.status != HttpStatusCode.OK) {
-                val errorBody = response.bodyAsText()
-                throw IOException("Unexpected response code: ${response.status}, message: $errorBody")
-            }
-
-            val responseBody = response.bodyAsText()
-            val openAiResponse = jsonFormat.decodeFromString<OpenAiResponse>(responseBody)
-
-            // Check if the API returned an error
-            if (openAiResponse.error != null) {
-                throw IOException("OpenAI API error: ${openAiResponse.error.message}")
-            }
-
-            // Extract the structured JSON output from the response
-            val messageContent = openAiResponse.output
-                .firstOrNull { it.type == "message" }
-                ?.content
-                ?.firstOrNull { it.type == "output_text" }
-                ?.text
-                ?: throw IOException("No valid output content found")
-
-            // Parse the JSON output into our model
-            jsonFormat.decodeFromString<CompatibilityResult>(messageContent)
-
-        } catch (e: Exception) {
-            throw IOException("Failed to get response from OpenAI API: ${e.message}", e)
         }
     }
 
-    /**
-     * Creates a prompt for the OpenAI API based on user information
-     */
+    // Existing methods remain unchanged
     private fun createPrompt(myInfo: String, userInfo: VrcUserInfo): String {
         return """
             Analyze the compatibility between me and another VRChat user.
@@ -159,12 +161,10 @@ class OpenAiClient(private val apiKey: String) {
         """.trimIndent()
     }
 
-    /**
-     * Creates the JSON request body for the OpenAI API call
-     */
     private fun createRequestBody(prompt: String): String {
         val requestJsonObject = buildJsonObject {
-            put("model", "gpt-4o-2024-11-20")
+//            put("model", "gpt-4o-2024-11-20")
+            put("model", "gpt-4.5-preview-2025-02-27\n")
             put("input", prompt)
 
             putJsonObject("text") {
@@ -174,13 +174,9 @@ class OpenAiClient(private val apiKey: String) {
             }
         }
 
-        // Encode the JSON object to a string
         return jsonFormat.encodeToString(JsonObject.serializer(), requestJsonObject)
     }
 
-    /**
-     * Clean up resources when done
-     */
     fun close() {
         client.close()
     }
