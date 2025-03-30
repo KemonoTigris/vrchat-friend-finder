@@ -16,6 +16,8 @@ import kotlinx.coroutines.runBlocking
 
 suspend fun main() {
     val config = loadProperties()
+    val coroutineScope = CoroutineScope(Dispatchers.IO)
+
     val database = DatabaseFactory.getDatabase()
     val vrcApiClient = VrcApiClient(
         username = config.getProperty("vrc.username"),
@@ -48,12 +50,14 @@ suspend fun main() {
             println("User state changed: ${currentUsers.size} users in instance")
 
             // Process new users
-            currentUsers.forEach { userId ->
-                if (userId !in previousUsers) {
-                    println("Processing new user: $userId")
-                    compatibilityService.processUser(userId)
+            currentUsers
+                .filter { userId -> userId !in previousUsers }
+                .forEach { userId ->
+                    coroutineScope.launch {
+                        println("Processing new user: $userId")
+                        compatibilityService.processUser(userId)
+                    }
                 }
-            }
 
             // Handle users who left
             val departedUsers = previousUsers - currentUsers
